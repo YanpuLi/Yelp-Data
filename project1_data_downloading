@@ -1,0 +1,116 @@
+# -*- coding: utf-8 -*-
+"""
+Yelp API v2.0 code sample.
+This program demonstrates the capability of the Yelp API version 2.0
+by using the Search API to query for businesses by a search term and location,
+and the Business API to query additional information about the top result
+from the search query.
+Please refer to http://www.yelp.com/developers/documentation for the API
+documentation.
+This program requires the Python oauth2 library, which you can install via:
+`pip install -r requirements.txt`.
+"""
+
+'''
+value restrictions:
+limit <= 20
+offset <= 980
+'''
+import argparse
+import json
+import pprint
+import sys
+import urllib
+import urllib2
+import io
+import oauth2
+
+
+API_HOST = 'api.yelp.com'
+
+
+SEARCH_PATH = '/v2/search/'
+BUSINESS_PATH = '/v2/business/'
+
+'''
+OAuth credential placeholders that must be filled in by users. 
+Please fill in the four parameters with yr own key to make sure we all can get 12,000 calls per day
+key generating website https://www.yelp.com/developers/manage_api_keys
+'''
+CONSUMER_KEY = "bW4DW3lBc79NLZoouj9xBg"
+CONSUMER_SECRET = "3q2wCG8J3D_pdQZ2F2e_YD09Nos"
+TOKEN = "VKvmNOORPT2QtkcstKTUY4jC_T3cOAV0"
+TOKEN_SECRET = "LkH5SyLcIeYn7J6G84jLXppEOsM"
+
+
+def request(term, location, host, path, offsetNum):
+    """Prepares OAuth authentication and sends the request to the API.
+    Args:
+        host (str): The domain host of the API.
+        path (str): The path of the API after the domain.
+        url_params (dict): An optional set of query parameters in the request.
+    Returns:
+        dict: The JSON response from the request.
+    Raises:
+        urllib2.HTTPError: An error occurs from the HTTP request.
+    """
+    flag = "TRUE"
+    
+
+    url_params = {
+                    'term': term.replace(' ', '+'),
+                    'location': location.replace(' ', '+'),
+                    'limit': 20,
+                    'offset': offsetNum
+                    }
+    url = 'https://{0}{1}?'.format(host, urllib.quote(path.encode('utf8')))
+
+    consumer = oauth2.Consumer(CONSUMER_KEY, CONSUMER_SECRET)
+    oauth_request = oauth2.Request(method="GET", url=url, parameters=url_params)
+
+    oauth_request.update(
+            {
+                'oauth_nonce': oauth2.generate_nonce(),
+                'oauth_timestamp': oauth2.generate_timestamp(),
+                'oauth_token': TOKEN,
+                'oauth_consumer_key': CONSUMER_KEY
+            }
+        )
+    token = oauth2.Token(TOKEN, TOKEN_SECRET)
+    oauth_request.sign_request(oauth2.SignatureMethod_HMAC_SHA1(), consumer, token)
+    signed_url = oauth_request.to_url()
+
+
+    conn = urllib2.urlopen(signed_url, None)
+    
+        
+    response = json.loads(conn.read())
+    conn.close()    
+    
+    return response
+
+def main():
+    #setting the term & location that u want to query
+    term = "Health & Medical"
+    location = "boston"
+    offsetNum = 0
+    #recording the totalNum of this category
+    totalNum = (request(term, location, API_HOST, SEARCH_PATH, offsetNum))['total']
+    print "The total number of this category you are searching is : %s"%totalNum
+    file1 = open("/Users/Lesley/Desktop/health.json","w")
+    flag = 1
+    while(flag):
+        try:
+            result = request(term, location, API_HOST, SEARCH_PATH, offsetNum)
+        except urllib2.HTTPError as error:
+            sys.exit('Encountered HTTP error {0}. Abort program.'.format(error.code))
+        # saving dataset into json 
+        file1.write(json.dumps(result,indent =4))
+        offsetNum = 20
+        totalNum = totalNum - 20
+        if(totalNum <= 0):
+            flag = 0
+            file1.close()
+
+if __name__ == '__main__':
+    main()
